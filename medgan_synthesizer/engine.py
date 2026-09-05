@@ -3,7 +3,6 @@ Core Algorithmic Engine & Cryptographic / Biological Logic for MedGAN-Synthesize
 Domain: Privacy-Preserving Federated Healthcare & FHE
 Standard: Synthetic Data Generation Best Practices
 """
-import math
 from typing import Dict, Any, List, Optional
 from .models import FrontierPayload, AgentTelemetryAlert, ExecutionStatus
 

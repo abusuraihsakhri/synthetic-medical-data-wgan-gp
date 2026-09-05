@@ -63,3 +63,31 @@ def test_supervisor_consensus_and_audit():
     assert main(["audit", "--task-id", "CLI-TEST-01"]) == 0
     assert main(["chat", "Explain", "specifications"]) == 0
     assert main(["verify-audit"]) == 0
+
+
+def test_metric_validation_rejects_nan_inf():
+    """Ensure NaN and Inf metric values are rejected by validation."""
+    import math
+    import pytest
+
+    with pytest.raises(Exception):
+        SystemTaskPayload(task_id="T-NAN", target_identifier="K", primary_metric=math.nan)
+
+    with pytest.raises(Exception):
+        SystemTaskPayload(task_id="T-INF", target_identifier="K", primary_metric=math.inf)
+
+    with pytest.raises(Exception):
+        SystemTaskPayload(task_id="T-NINF", target_identifier="K", secondary_metric=-math.inf)
+
+
+def test_batch_file_not_found():
+    """Ensure batch command handles missing input file gracefully."""
+    assert main(["batch", "-i", "nonexistent_file_xyz.csv"]) == 1
+
+
+def test_phi_redaction():
+    """Ensure PHI is properly redacted from text."""
+    redacted = PHIGuard.redact_phi("Patient MRN-12345678 has SSN 123-45-6789")
+    assert "MRN-12345678" not in redacted
+    assert "123-45-6789" not in redacted
+    assert "[REDACTED_IDENTIFIER]" in redacted
