@@ -16,7 +16,7 @@ The thresholds (`primary_metric > 25` and `secondary_metric > 12`, plus descript
 
 ## Requirements and installation
 
-Python 3.10–3.12 is tested in CI. From the repository root:
+CI is configured to test Python 3.10–3.12. From the repository root:
 
 ```bash
 python -m pip install -e ".[api,dev]"
@@ -78,7 +78,7 @@ export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32
 docker compose up --build
 ```
 
-Set and persist a strong secret through your deployment's secret manager in production. The audit ledger is stored only in memory and is lost on process restart; an ephemeral key is generated for non-Compose use if `AUDIT_SECRET_KEY` is unset, with a warning.
+Set and persist a strong secret through your deployment's secret manager in production. Do not reuse the previously committed sample key; treat it as publicly exposed. The audit ledger is stored only in memory and is lost on process restart; an ephemeral key is generated for non-Compose use if `AUDIT_SECRET_KEY` is unset, with a warning.
 
 ## Security and limitations
 
