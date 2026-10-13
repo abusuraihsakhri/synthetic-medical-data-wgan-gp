@@ -4,24 +4,33 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "synthetic-medical-data-wgan-gp"
-version = "2.0.0"
-description = "MedGAN-Synthesizer: Wasserstein GAN with Gradient Penalty Clinical Generator"
+version = "2.0.1"
+description = "Deterministic audit and threshold-evaluation utilities (no trained WGAN-GP)"
 readme = "README.md"
-authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
+authors = [{ name = "Dr. Abu Suraih Sakhri" }]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Security/Cryptography",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-requires-python = ">=3.9"
-dependencies = []
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2,<3"]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110,<1", "uvicorn>=0.27,<1"]
+dev = ["pytest>=8,<10", "httpx>=0.27,<1"]
 
 [project.scripts]
 synthetic-medical-data-wgan-gp = "medgan_synthesizer.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/abusuraihsakhri/synthetic-medical-data-wgan-gp"
-Repository = "https://github.com/abusuraihsakhri/synthetic-medical-data-wgan-gp.git"
+Repository = "https://github.com/abusuraihsakhri/synthetic-medical-data-wgan-gp"
+
+[tool.setuptools]
+py-modules = ["cli", "enrichment", "simulator", "medgan_synthesizer_app"]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "medgan_synthesizer*"]

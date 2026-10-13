@@ -1,180 +1,99 @@
 # Synthetic Medical Data WGAN-GP
 
-> **Domain:** Privacy-Preserving Healthcare & Federated Computing
-> **Reference Guidelines & Standards:** `HIPAA Safe Harbor §164.514 & Differential Privacy RDP`
+A Python repository containing **deterministic threshold-evaluation utilities** and a browser-based audit demonstration. Despite the historical repository name, the checked-in source **does not implement WGAN-GP training, gradient penalties, synthetic EHR sampling, federated learning, formal differential privacy, or membership-inference measurements**. It must not be represented as a validated medical-data synthesizer.
 
-<div align="center">
+## What works
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+- A three-worker audit pipeline for primary metrics, secondary metrics and descriptor flags, with routine/elevated/critical classifications.
+- A FastAPI service exposing health, metrics, audit, chat-stub and audit-log endpoints.
+- A SHA-256/HMAC-chained, **in-memory** audit trail; integrity verification recomputes signatures and validates link continuity.
+- CSV batch processing through the Python CLI and JSON results through the API.
+- A standalone [local browser demonstration](web/index.html) with JSON download. It executes the corresponding threshold rules entirely in the browser and does **not** sign its results.
+- A separate legacy `medgan_synthesizer` CLI/API with a similar threshold evaluator (different thresholds).
+- Eight general-purpose enrichment modules that reuse threshold checks; they do not implement full FHIR analytics, terminology systems or data-quality pipelines.
 
-</div>
+The thresholds (`primary_metric > 25` and `secondary_metric > 12`, plus descriptor keywords and the critical flag) are **illustrative software rules**, not clinically derived or validated reference limits.
 
----
+## Requirements and installation
 
-## What It Does
-
-**Synthetic Medical Data WGAN-GP** is a clinical table analysis platform implementing a multi-agent evaluation system with Wasserstein GAN with Gradient Penalty concepts for synthetic data generation. It provides privacy-preserving analysis with Zero-PHI outbound protection and tamper-evident HMAC-SHA256 audit trails.
-
----
-
-## Key Capabilities & Algorithmic Modules
-
-- **Multi-Agent Evaluation System**: Three specialized workers (InvariantQC, SafetyEscalation, ProtocolConformance) analyze task payloads
-- **Zero-PHI Outbound Interceptor**: Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers
-- **Tamper-Evident HMAC-SHA256 Audit Trail**: Chained, cryptographically signed logs for every evaluation
-- **MedGAN Synthesizer**: Wasserstein GAN with Gradient Penalty clinical generator with distribution matching and membership inference defense
-- **FastAPI REST API**: OpenAPI 3.1 endpoints with Prometheus telemetry (`/metrics`)
-- **Enrichment Suite**: Feature analysis, data quality dashboard, terminology management, ETL monitoring, FHIR analytics, clinical decision support, interoperability, and data governance modules
-
----
-
-## Installation
+CI is configured to test Python 3.10–3.12. From the repository root:
 
 ```bash
-# Clone the repository
-git clone https://github.com/abusuraihsakhri/synthetic-medical-data-wgan-gp.git
-cd synthetic-medical-data-wgan-gp
-
-# Install dependencies
-pip install fastapi uvicorn pydantic pytest
+python -m pip install -e ".[api,dev]"
+python -m pytest -q
 ```
 
----
+The `pydantic` runtime dependency is declared in `pyproject.toml`; the `api` extra installs FastAPI and Uvicorn. The installed `synthetic-medical-data-wgan-gp` command currently invokes the **legacy** `medgan_synthesizer` CLI. For the main three-worker service, run `python cli.py` explicitly.
 
-## CLI Quickstart & Usage
+## Main command-line workflows
 
-### 1. Run Single Task Evaluation
 ```bash
-python cli.py audit --task-id TASK-001 --target TARGET-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
-```
-
-### 2. Chat with Supervisor
-```bash
-python cli.py chat "What is the system status?"
-```
-
-### 3. Batch Process CSV Records
-```bash
+python cli.py audit --task-id DEMO-001 --target SAMPLE-A --primary 29.4 --secondary 14.8 --critical --status DISCORDANT
+python cli.py chat "What can this supervisor do?"
 python cli.py batch -i sample.csv -o results.csv
-```
-
-### 4. Verify Audit Trail Integrity
-```bash
 python cli.py verify-audit
-```
-
-### 5. Launch FastAPI REST Server
-```bash
 python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
-### CLI Parameters
+Batch input CSV columns: `task_id`, `target_identifier`, `primary_metric`, `secondary_metric`, `is_critical_flag`, `status_descriptor`. The primary metric is required; missing optional metrics use the CLI's default. Critical flag values accept `true/false`, `yes/no` or `1/0` (case-insensitive); ambiguous values are rejected. The output is a separate CSV file.
 
-| Parameter | Description | Default |
-|:----------|:------------|:--------|
-| `--task-id` | Unique task identifier | `TASK-2026-001` |
-| `--target` | Target identifier | `KEY-TARGET-01` |
-| `--primary` | Primary metric (float) | `28.5` |
-| `--secondary` | Secondary metric (float) | `14.2` |
-| `--critical` | Critical flag (boolean) | `False` |
-| `--status` | Status descriptor | `DISCORDANT` |
+For the legacy CLI, run `python medgan_synthesizer_app.py --help` or the installed `synthetic-medical-data-wgan-gp --help`.
 
-### Input Data Schema (CSV Batch)
+## Local API
 
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `task_id` | Task identifier | Required |
-| `target_identifier` | Target identifier | Required |
-| `primary_metric` | Primary measurement (float) | Required |
-| `secondary_metric` | Secondary measurement (float) | Optional |
-| `is_critical_flag` | Critical flag (boolean) | Optional |
-| `status_descriptor` | Status descriptor | Optional |
+Start the server with `python cli.py serve` and visit `http://127.0.0.1:8000/docs` for the live OpenAPI schema.
 
----
+| Method | Path | Output |
+| --- | --- | --- |
+| GET | `/health` | Service status |
+| GET | `/metrics` | JSON counters (not Prometheus exposition format) |
+| POST | `/api/audit` | Evaluated task dossier |
+| POST | `/api/chat` | Deterministic mock response; **not an LLM** |
+| GET | `/api/audit/logs` | In-memory audit entries and signature verification |
 
-## REST API Endpoints
-
-| Method | Endpoint | Description |
-|:-------|:---------|:------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/metrics` | Prometheus operational metrics |
-| `POST` | `/api/audit` | Submit task for evaluation |
-| `POST` | `/api/chat` | Chat with supervisor |
-| `GET` | `/api/audit/logs` | Retrieve audit trail |
-
----
-
-## Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Audit Secret Key:** Configurable via `AUDIT_SECRET_KEY` environment variable. A random key is generated if not set (with a warning).
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## Testing & Verification
-
-Run the automated test suite:
+Example:
 
 ```bash
-pytest -v
+curl -X POST http://127.0.0.1:8000/api/audit \
+  -H 'Content-Type: application/json' \
+  -d '{"task_id":"DEMO-001","target_identifier":"SAMPLE-A","primary_metric":18,"secondary_metric":2}'
 ```
 
-Execute high-throughput batch simulation benchmarks:
+There is no built-in user authentication or persistence. **Do not expose this service directly to the public Internet or send actual clinical records.** A deployment handling real data requires application security and a formal privacy review beyond this repository.
+
+## Browser application / GitHub Pages
+
+Open `web/index.html` in a modern desktop or mobile browser for offline, client-side demonstration of the audit logic. All input evaluation stays on the local page; no storage or server calls are used for evaluation. The optional linked GitHub repository is an external site, and no claim is made that arbitrary patient identifiers are safe.
+
+`.github/workflows/pages.yml` is configured to deploy the `web/` directory from `master`. Publishing requires GitHub Pages to be configured for **GitHub Actions** in repository settings. A live Pages URL should be advertised only after successful deployment and direct verification.
+
+This site does not run Python or Pyodide: the deterministic audit rules are implemented in JavaScript, while the Python API remains a separate backend. Real model training would require a substantial new implementation and appropriate compute/runtime support.
+
+## Container
+
+The Compose configuration requires a private audit key from the environment. For local testing:
 
 ```bash
-python simulator.py 1000
+export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+docker compose up --build
 ```
 
----
+Set and persist a strong secret through your deployment's secret manager in production. Do not reuse the previously committed sample key; treat it as publicly exposed. The audit ledger is stored only in memory and is lost on process restart; an ephemeral key is generated for non-Compose use if `AUDIT_SECRET_KEY` is unset, with a warning.
 
-## Container Deployment
+## Security and limitations
+
+The identifier guard detects a **limited set of regex patterns** (e.g. MRNs, SSNs, some telephone numbers, names and email addresses). It is **not** comprehensive de-identification and does not establish HIPAA Safe Harbor compliance, privacy guarantees, or absence of protected health information. The audit chain detects tampering in its current in-memory records when the signing key is trusted, but has no durable independent storage or key management. The static demo has no cryptographic signatures.
+
+Results are not clinical recommendations. There is no demonstrated distribution matching or re-identification-risk evaluation.
+
+## Development and verification
 
 ```bash
-docker build -t synthetic-medical-data-wgan-gp .
-docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key synthetic-medical-data-wgan-gp
+python -m pytest -q
+python -m compileall -q agents medgan_synthesizer cli.py enrichment.py simulator.py
+python simulator.py 100
 ```
 
-Or using Docker Compose:
+GitHub Actions checks Python 3.10, 3.11 and 3.12, CLI batch behavior, Python syntax, and JavaScript syntax. No lockfile is currently maintained. The static UI has no external JavaScript dependencies and is responsive to narrow screens.
 
-```bash
-docker-compose up -d
-```
-
----
-
-## Project Structure
-
-```
-synthetic-medical-data-wgan-gp/
-├── agents/                  # Core multi-agent evaluation system
-│   ├── api.py              # FastAPI REST server
-│   ├── base.py             # Security, PHI guard, audit trail
-│   ├── models.py           # Pydantic data models
-│   ├── supervisor.py       # Supervisor orchestrator
-│   ├── workers.py          # Specialized worker agents
-│   ├── llm_factory.py      # LLM provider factory
-│   ├── learning.py         # Bayesian calibration engine
-│   ├── metrics.py          # Prometheus metrics collector
-│   └── streamer.py         # WebSocket telemetry broadcaster
-├── medgan_synthesizer/      # WGAN-GP clinical generator
-│   ├── agents.py           # MedGAN coordinator & sub-agents
-│   ├── engine.py           # Core algorithmic engine
-│   ├── models.py           # Data models
-│   ├── cli.py              # MedGAN CLI
-│   └── server.py           # MedGAN FastAPI server
-├── tests/                   # Pytest test suite
-├── web/                     # Operations console (HTML)
-├── cli.py                   # Main CLI entry point
-├── simulator.py             # High-throughput simulation
-├── enrichment.py            # Enrichment feature modules
-├── pyproject.toml           # Project configuration
-├── Dockerfile               # Container build
-└── docker-compose.yml       # Container orchestration
-```
+**License:** [MIT](LICENSE).

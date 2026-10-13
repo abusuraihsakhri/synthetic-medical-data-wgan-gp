@@ -5,11 +5,25 @@ import argparse
 import csv
 import json
 import sys
+from pathlib import Path
 from agents.models import SystemTaskPayload
 from agents.supervisor import SystemSupervisor
-from agents.base import AuditLogger
+from agents.base import AuditLogger, SecurityException
 
 supervisor = SystemSupervisor(model_provider="mock")
+
+
+
+def parse_boolean(value):
+    """Parse CSV boolean values without treating 'False' as True."""
+    if isinstance(value, bool):
+        return value
+    normalized = str(value if value is not None else "").strip().lower()
+    if normalized in ("true", "1", "yes", "y", "on"):
+        return True
+    if normalized in ("false", "0", "no", "n", "off", ""):
+        return False
+    raise ValueError(f"Invalid boolean value: {value!r}")
 
 
 def main(argv=None):
@@ -81,40 +95,58 @@ def main(argv=None):
 
     if args.command == "batch":
         try:
-            with open(args.input, mode="r", encoding="utf-8-sig") as f:
+            with open(args.input, mode="r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
                 fieldnames = list(reader.fieldnames or [])
                 rows = list(reader)
-        except FileNotFoundError:
-            print(f"Error: Input file '{args.input}' not found.", file=sys.stderr)
-            return 1
-        except PermissionError:
-            print(f"Error: Permission denied reading '{args.input}'.", file=sys.stderr)
+        except OSError as exc:
+            print(f"Error: Cannot read input CSV: {exc}", file=sys.stderr)
             return 1
 
-        out_fields = fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
+        if not fieldnames:
+            print("Error: CSV file has no header.", file=sys.stderr)
+            return 1
+        output_fields = ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
+        if any(name in fieldnames for name in output_fields):
+            print("Error: Input CSV already contains an output column.", file=sys.stderr)
+            return 1
+        if Path(args.input).resolve() == Path(args.output).resolve():
+            print("Error: Input and output paths must differ.", file=sys.stderr)
+            return 1
+
+        out_fields = fieldnames + output_fields
         out_rows = []
-        for r in rows:
-            payload = SystemTaskPayload(
-                task_id=r.get("task_id", "TASK-01"),
-                target_identifier=r.get("target_identifier", "TARGET-01"),
-                primary_metric=float(r.get("primary_metric", 15.0)),
-                secondary_metric=float(r.get("secondary_metric", 5.0)),
-                status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
-            )
-            dossier = supervisor.process_task(payload)
-            row_dict = dict(r)
-            row_dict["overall_urgency"] = dossier.overall_urgency.value
-            row_dict["integrity_status"] = dossier.integrity_status.value
-            row_dict["total_alerts"] = dossier.total_alerts
-            row_dict["audit_hash"] = dossier.audit_hash
-            out_rows.append(row_dict)
+        for line_number, row in enumerate(rows, start=2):
+            try:
+                if None in row or not (row.get("primary_metric") or "").strip():
+                    raise ValueError("Malformed row or missing primary_metric")
+                payload = SystemTaskPayload(
+                    task_id=row.get("task_id") or "TASK-01",
+                    target_identifier=row.get("target_identifier") or "TARGET-01",
+                    primary_metric=float(row["primary_metric"]),
+                    secondary_metric=float(row.get("secondary_metric") or 5.0),
+                    status_descriptor=row.get("status_descriptor") or "NOMINAL",
+                    is_critical_flag=parse_boolean(row.get("is_critical_flag")),
+                )
+                dossier = supervisor.process_task(payload)
+                enriched = dict(row)
+                enriched["overall_urgency"] = dossier.overall_urgency.value
+                enriched["integrity_status"] = dossier.integrity_status.value
+                enriched["total_alerts"] = dossier.total_alerts
+                enriched["audit_hash"] = dossier.audit_hash
+                out_rows.append(enriched)
+            except (ValueError, TypeError, KeyError, SecurityException) as exc:
+                print(f"Error: Invalid CSV row {line_number}: {exc}", file=sys.stderr)
+                return 1
 
-        with open(args.output, mode="w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=out_fields)
-            writer.writeheader()
-            writer.writerows(out_rows)
+        try:
+            with open(args.output, mode="w", encoding="utf-8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=out_fields)
+                writer.writeheader()
+                writer.writerows(out_rows)
+        except OSError as exc:
+            print(f"Error: Cannot write output CSV: {exc}", file=sys.stderr)
+            return 1
         print(f"Processed {len(out_rows)} records -> {args.output}")
         return 0
 
