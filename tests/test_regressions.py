@@ -78,8 +78,8 @@ def test_invalid_csv_booleans_fail_cleanly(tmp_path, entry, capsys):
     source = tmp_path / "input.csv"
     target = tmp_path / "output.csv"
     source.write_text(
-        "task_id,target_identifier,primary_metric,is_critical_flag\\n"
-        "T1,SAMPLE-A,10," + entry + "\\n", encoding="utf-8"
+        "task_id,target_identifier,primary_metric,is_critical_flag\n"
+        "T1,SAMPLE-A,10," + entry + "\n", encoding="utf-8"
     )
     assert enterprise_main(["batch", "-i", str(source), "-o", str(target)]) == 1
     assert not target.exists()
@@ -88,6 +88,6 @@ def test_invalid_csv_booleans_fail_cleanly(tmp_path, entry, capsys):
 
 def test_batch_rejects_overwriting_source(tmp_path):
     source = tmp_path / "input.csv"
-    source.write_text("task_id,primary_metric\\nT1,12\\n", encoding="utf-8")
+    source.write_text("task_id,primary_metric\nT1,12\n", encoding="utf-8")
     assert enterprise_main(["batch", "-i", str(source), "-o", str(source)]) == 1
     assert "T1,12" in source.read_text()
