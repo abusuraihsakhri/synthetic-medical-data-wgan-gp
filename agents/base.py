@@ -9,6 +9,7 @@ import time
 import hmac
 import hashlib
 import secrets
+import copy
 import warnings
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
@@ -94,14 +95,25 @@ class AuditTrail:
         return entry
 
     def verify_integrity(self) -> bool:
-        for i, entry in enumerate(self.logs):
-            prev = self.logs[i-1]["current_hash"] if i > 0 else "GENESIS_BLOCK_0000000000000000"
-            if entry["prev_hash"] != prev:
+        """Verify both chaining and HMAC signatures for every stored block."""
+        previous = "GENESIS_BLOCK_0000000000000000"
+        required = ("audit_id", "timestamp", "actor", "actor_tier",
+                    "event_type", "payload_hash", "prev_hash", "current_hash")
+        for entry in self.logs:
+            if not isinstance(entry, dict) or any(k not in entry or not isinstance(entry[k], str) for k in required):
                 return False
+            if not hmac.compare_digest(entry["prev_hash"], previous):
+                return False
+            message = "|".join(entry[key] for key in required[:-1])
+            expected = hmac.new(self.secret_key, message.encode("utf-8"), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(entry["current_hash"], expected):
+                return False
+            previous = entry["current_hash"]
         return True
 
     def get_trail(self) -> List[Dict[str, Any]]:
-        return self.logs
+        """Prevent callers from modifying the in-memory signed ledger."""
+        return copy.deepcopy(self.logs)
 
 
 GLOBAL_AUDIT = AuditTrail()
