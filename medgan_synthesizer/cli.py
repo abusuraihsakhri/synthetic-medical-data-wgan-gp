@@ -110,7 +110,7 @@ def main(argv=None):
         out_rows = []
         for line_number, r in enumerate(rows, start=2):
             try:
-                if None in r or not r.get("primary_metric", "").strip():
+                if None in r or not (r.get("primary_metric") or "").strip():
                     raise ValueError("Malformed row or missing primary_metric")
                 payload = FrontierPayload(
                     task_id=r.get("task_id") or "TASK-01",
