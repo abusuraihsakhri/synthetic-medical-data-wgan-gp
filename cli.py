@@ -95,19 +95,18 @@ def main(argv=None):
 
     if args.command == "batch":
         try:
-            with open(args.input, mode="r", encoding="utf-8-sig") as f:
+            with open(args.input, mode="r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
                 fieldnames = list(reader.fieldnames or [])
                 rows = list(reader)
-        except FileNotFoundError:
-            print(f"Error: Input file '{args.input}' not found.", file=sys.stderr)
+        except OSError as exc:
+            print(f"Error: Cannot read input CSV: {exc}", file=sys.stderr)
             return 1
-        except PermissionError:
-            print(f"Error: Permission denied reading '{args.input}'.", file=sys.stderr)
-           if not fieldnames:
+
+        if not fieldnames:
             print("Error: CSV file has no header.", file=sys.stderr)
             return 1
-        output_fields = ["overall_urgency","integrity_status","total_alerts","audit_hash"]
+        output_fields = ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
         if any(name in fieldnames for name in output_fields):
             print("Error: Input CSV already contains an output column.", file=sys.stderr)
             return 1
@@ -117,30 +116,28 @@ def main(argv=None):
 
         out_fields = fieldnames + output_fields
         out_rows = []
-        for line_number, r in enumerate(rows, start=2):
+        for line_number, row in enumerate(rows, start=2):
             try:
-                if None in r or not (r.get("primary_metric") or "").strip():
+                if None in row or not (row.get("primary_metric") or "").strip():
                     raise ValueError("Malformed row or missing primary_metric")
                 payload = SystemTaskPayload(
-                    task_id=r.get("task_id") or "TASK-01",
-                    target_identifier=r.get("target_identifier") or "TARGET-01",
-                    primary_metric=float(r["primary_metric"]),
-                    secondary_metric=float(r.get("secondary_metric") or 5.0),
-                    status_descriptor=r.get("status_descriptor") or "NOMINAL",
-                    is_critical_flag=parse_boolean(r.get("is_critical_flag")),
+                    task_id=row.get("task_id") or "TASK-01",
+                    target_identifier=row.get("target_identifier") or "TARGET-01",
+                    primary_metric=float(row["primary_metric"]),
+                    secondary_metric=float(row.get("secondary_metric") or 5.0),
+                    status_descriptor=row.get("status_descriptor") or "NOMINAL",
+                    is_critical_flag=parse_boolean(row.get("is_critical_flag")),
                 )
                 dossier = supervisor.process_task(payload)
-                row_dict = dict(r)
-                row_dict["overall_urgency"] = dossier.overall_urgency.value
-                row_dict["integrity_status"] = dossier.integrity_status.value
-                row_dict["total_alerts"] = dossier.total_alerts
-                row_dict["audit_hash"] = dossier.audit_hash
-                out_rows.append(row_dict)
+                enriched = dict(row)
+                enriched["overall_urgency"] = dossier.overall_urgency.value
+                enriched["integrity_status"] = dossier.integrity_status.value
+                enriched["total_alerts"] = dossier.total_alerts
+                enriched["audit_hash"] = dossier.audit_hash
+                out_rows.append(enriched)
             except (ValueError, TypeError, KeyError, SecurityException) as exc:
                 print(f"Error: Invalid CSV row {line_number}: {exc}", file=sys.stderr)
                 return 1
-
-.append(row_dict)
 
         try:
             with open(args.output, mode="w", encoding="utf-8", newline="") as f:
