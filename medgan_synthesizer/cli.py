@@ -150,6 +150,9 @@ def main(argv=None):
             if app:
                 print(f"Starting MedGAN-Synthesizer: Wasserstein GAN with Gradient Penalty Clinical Generator on http://{args.host}:{args.port}")
                 uvicorn.run(app, host=args.host, port=args.port)
+            else:
+                print("FastAPI is not installed.", file=sys.stderr)
+                return 1
         except ImportError:
             print("FastAPI / uvicorn not installed. Run 'pip install fastapi uvicorn'")
             return 1
