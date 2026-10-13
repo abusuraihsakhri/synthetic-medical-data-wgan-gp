@@ -15,7 +15,7 @@ def create_app():
 
         app = FastAPI(
             title="MedGAN-Synthesizer: Wasserstein GAN with Gradient Penalty Clinical Generator",
-            description="Generates continuous and discrete clinical EHR tables with exact marginal distribution preservation and empirical privacy disclosure metrics.",
+            description="Demonstration-only rule-based threshold audits. Does not train a GAN, generate synthetic EHR data, or measure privacy.",
             version="2.0.0-FRONTIER",
         )
 
