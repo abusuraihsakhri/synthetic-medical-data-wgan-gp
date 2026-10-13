@@ -28,3 +28,9 @@ synthetic-medical-data-wgan-gp = "medgan_synthesizer.cli:main"
 [project.urls]
 Homepage = "https://github.com/abusuraihsakhri/synthetic-medical-data-wgan-gp"
 Repository = "https://github.com/abusuraihsakhri/synthetic-medical-data-wgan-gp"
+
+[tool.setuptools]
+py-modules = ["cli", "enrichment", "simulator", "medgan_synthesizer_app"]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "medgan_synthesizer*"]
